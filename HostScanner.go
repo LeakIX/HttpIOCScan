@@ -51,7 +51,7 @@ func (hs *HostScanner) testIfCitrixADC(event l9format.L9Event) bool {
 }
 
 func (hs *HostScanner) getNormalStatusCode(event l9format.L9Event) int {
-	// Checking for a valid ctx page before scanning
+	// Checking for a non-valid ctx page status code
 	randNumber := rand.IntN(10000000)
 	resp, err := hs.HttpClient.Get(event.Url() + fmt.Sprintf("/logon/LogonPoint/receiver/js/localization/file%d.php", randNumber))
 	if err != nil {
@@ -99,6 +99,7 @@ func (hs *HostScanner) scan(event l9format.L9Event, uri string, expectedStatusCo
 
 func (hs *HostScanner) scanUrls(event l9format.L9Event) {
 	event.Transports = []string{"tcp", "http", "tls"}
+	// Check if really ADC
 	if !hs.testIfCitrixADC(event) {
 		return
 	}
