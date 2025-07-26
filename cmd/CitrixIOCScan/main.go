@@ -15,7 +15,7 @@ var MaxRoutines = 1000
 
 func main() {
 	if len(os.Args) < 3 {
-		log.Fatal("%s requires at least 2 arguments: <url_list.txt> and <input_file.json>", os.Args[0])
+		log.Fatalf("%s requires at least 2 arguments: <url_list.txt> and <input_file.json>", os.Args[0])
 		os.Exit(1)
 	}
 	loadUrlList()
