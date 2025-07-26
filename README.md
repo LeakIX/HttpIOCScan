@@ -5,13 +5,13 @@ Tool to mass scan a bunch for Citrix servers with rate-limiting and abnormal rep
 ## Installation
 
 ```shell
-$ go install github.com/leakix/CitrixIOCScan@latest
+$ go install github.com/leakix/CitrixIOCScan/cmd/CitrixIOCScan@latest
 ```
 
 or build:
 
 ```shell
-$ CGO_ENABLED=0 go build -o CitrixIOCScan ./
+$ CGO_ENABLED=0 go build -o CitrixIOCScan ./cmd/CitrixIOCScan
 ```
 
 ## Usage

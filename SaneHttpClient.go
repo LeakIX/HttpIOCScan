@@ -1,4 +1,4 @@
-package main
+package CitrixIOCScan
 
 import (
 	"crypto/tls"
@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func GetSaneHttpClient() *http.Client {
+func GetSaneHttpClient(maxRoutines int) *http.Client {
 	return &http.Client{
 		Timeout: time.Second * 5,
 		Transport: &http.Transport{
@@ -15,7 +15,7 @@ func GetSaneHttpClient() *http.Client {
 			MaxIdleConnsPerHost:    1,
 			MaxConnsPerHost:        1,
 			TLSClientConfig: &tls.Config{
-				ClientSessionCache: tls.NewLRUClientSessionCache(MaxRoutines),
+				ClientSessionCache: tls.NewLRUClientSessionCache(maxRoutines),
 				InsecureSkipVerify: true,
 			},
 		},

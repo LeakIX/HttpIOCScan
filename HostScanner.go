@@ -1,4 +1,4 @@
-package main
+package CitrixIOCScan
 
 import (
 	"encoding/json"
@@ -18,6 +18,7 @@ type HostScanner struct {
 	HostChannel   chan l9format.L9Event
 	HttpClient    *http.Client
 	OutputEncoder *json.Encoder
+	Urls          []string
 }
 
 func (hs *HostScanner) Start() {
@@ -81,7 +82,7 @@ func (hs *HostScanner) scan(event l9format.L9Event, uri string, expectedStatusCo
 			return false, nil
 		}
 		event.EventType = "leak"
-		event.EventSource = PluginName
+		event.EventSource = "CitrixIOScan"
 		event.EventPipeline = append(event.EventPipeline, event.EventSource)
 		event.Summary = "Citrix ADC abnormal reply:\n"
 		event.Summary += fmt.Sprintf("Found %d instead of %d on %s", resp.StatusCode, expectedStatusCode, finalUrl)
@@ -108,7 +109,7 @@ func (hs *HostScanner) scanUrls(event l9format.L9Event) {
 	}
 	// Go over URLs and check for 200s
 	connErrorCount := 0
-	for _, uri := range urls {
+	for _, uri := range hs.Urls {
 		found, err := hs.scan(event, uri, normalStatusCode)
 		// If found, no need to go deeper
 		if found {

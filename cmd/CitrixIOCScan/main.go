@@ -4,14 +4,13 @@ import (
 	"bufio"
 	"encoding/json"
 	"github.com/LeakIX/l9format"
+	CitrixIOCScan "github.com/leakix/pwndctxmapper"
 	"log"
 	"os"
 	"strings"
 	"sync"
 )
 
-var PluginName = "CitrixADC202501"
-var urls = []string{}
 var MaxRoutines = 1000
 
 func main() {
@@ -43,19 +42,21 @@ func main() {
 
 func StartHostScanners(waitGroup *sync.WaitGroup, num int, hostChan chan l9format.L9Event) {
 	OutputEncoder := json.NewEncoder(os.Stdout)
-	HttpClient := GetSaneHttpClient()
+	HttpClient := CitrixIOCScan.GetSaneHttpClient(MaxRoutines)
 	for i := 0; i < num; i++ {
-		hs := HostScanner{
+		hs := CitrixIOCScan.HostScanner{
 			WaitGroup:     waitGroup,
 			HostChannel:   hostChan,
 			OutputEncoder: OutputEncoder,
 			HttpClient:    HttpClient,
+			Urls:          loadUrlList(),
 		}
 		go hs.Start()
 	}
 }
 
-func loadUrlList() {
+func loadUrlList() []string {
+	var urls []string
 	file, err := os.Open(os.Args[1])
 	if err != nil {
 		log.Fatal(err)
@@ -71,4 +72,5 @@ func loadUrlList() {
 	if len(urls) == 0 {
 		log.Fatal("No urls found")
 	}
+	return urls
 }
