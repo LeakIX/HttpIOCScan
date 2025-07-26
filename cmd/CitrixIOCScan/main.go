@@ -43,13 +43,14 @@ func main() {
 func StartHostScanners(waitGroup *sync.WaitGroup, num int, hostChan chan l9format.L9Event) {
 	OutputEncoder := json.NewEncoder(os.Stdout)
 	HttpClient := CitrixIOCScan.GetSaneHttpClient(MaxRoutines)
+	UrlList := loadUrlList()
 	for i := 0; i < num; i++ {
 		hs := CitrixIOCScan.HostScanner{
 			WaitGroup:     waitGroup,
 			HostChannel:   hostChan,
 			OutputEncoder: OutputEncoder,
 			HttpClient:    HttpClient,
-			Urls:          loadUrlList(),
+			Urls:          UrlList,
 		}
 		go hs.Start()
 	}
