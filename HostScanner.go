@@ -81,6 +81,10 @@ func (hs *HostScanner) scan(event l9format.L9Event, uri string, expectedStatusCo
 		if strings.HasPrefix(uri, "/logon/LogonPoint/receiver/css/themes_gw") && resp.StatusCode == 404 {
 			return false, nil
 		}
+		if len(resp.TLS.PeerCertificates) > 0 {
+			event.SSL.Certificate.CommonName = resp.TLS.PeerCertificates[0].Subject.CommonName
+			event.SSL.Certificate.Domains = resp.TLS.PeerCertificates[0].DNSNames
+		}
 		event.EventType = "leak"
 		event.EventSource = "CitrixIOScan"
 		event.EventPipeline = append(event.EventPipeline, event.EventSource)
