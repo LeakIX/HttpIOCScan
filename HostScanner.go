@@ -25,9 +25,10 @@ func (hs *HostScanner) Start() {
 	hs.WaitGroup.Add(1)
 	defer hs.WaitGroup.Done()
 	for host := range hs.HostChannel {
-		log.Println("Scanning host", host)
+		host.Transports = []string{"tcp", "http", "tls"}
+		log.Printf("Scanning host: %s", host.Url())
 		hs.scanUrls(host)
-		log.Println("Finished scanning host", host)
+		log.Printf("Finished scanning host: %s", host.Url())
 	}
 }
 
@@ -67,7 +68,7 @@ func (hs *HostScanner) scan(event l9format.L9Event, uri string, expectedStatusCo
 	finalUrl := event.Url() + uri
 	resp, err := hs.HttpClient.Get(finalUrl)
 	if err != nil {
-		log.Println("Error scanning host/uri", event.Host, uri, err)
+		log.Printf("Error scanning host/uri: %s", finalUrl, err)
 		return false, err
 	}
 	defer resp.Body.Close()
@@ -102,7 +103,6 @@ func (hs *HostScanner) scan(event l9format.L9Event, uri string, expectedStatusCo
 }
 
 func (hs *HostScanner) scanUrls(event l9format.L9Event) {
-	event.Transports = []string{"tcp", "http", "tls"}
 	// Check if really ADC
 	if !hs.testIfCitrixADC(event) {
 		return
