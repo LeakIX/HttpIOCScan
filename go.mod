@@ -1,4 +1,4 @@
-module github.com/leakix/pwndctxmapper
+module github.com/leakix/CitrixIOCScan
 
 go 1.23
 

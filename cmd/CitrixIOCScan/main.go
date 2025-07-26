@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"github.com/LeakIX/l9format"
-	CitrixIOCScan "github.com/leakix/pwndctxmapper"
+	"github.com/leakix/CitrixIOCScan"
 	"log"
 	"os"
 	"strings"
