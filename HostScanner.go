@@ -26,7 +26,6 @@ func (hs *HostScanner) Start() {
 	hs.WaitGroup.Add(1)
 	defer hs.WaitGroup.Done()
 	for host := range hs.HostChannel {
-		host.Transports = []string{"tcp", "http", "tls"}
 		log.Printf("Scanning host: %s", host.Url())
 		hs.scanUrls(host)
 		log.Printf("Finished scanning host: %s", host.Url())

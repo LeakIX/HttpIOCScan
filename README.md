@@ -131,9 +131,3 @@ Detection rules are defined in JSON format matching the DetectionRule struct:
 - **Baseline detection**: Establishes normal response codes for non-existent files
 - **Exception handling**: Skip URLs with expected status codes
 - **Concurrent scanning**: Configurable number of parallel scanners
-
-## Limitations
-
-- Currently assumes HTTPS connections
-- Requires JSON configuration file (no default rules)
-- One detection rule per execution

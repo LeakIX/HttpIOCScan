@@ -21,48 +21,6 @@ type CLI struct {
 	Delay      time.Duration `short:"d" long:"delay" help:"Base delay between requests (randomized +0-900ms)" default:"1s"`
 }
 
-// parseURL converts a URL string to an L9Event
-func parseURL(urlStr string) (l9format.L9Event, error) {
-	parsedURL, err := url.Parse(strings.TrimSpace(urlStr))
-	if err != nil {
-		return l9format.L9Event{}, err
-	}
-
-	// Default to HTTPS port if no port specified
-	port := parsedURL.Port()
-	if port == "" {
-		if parsedURL.Scheme == "http" {
-			port = "80"
-		} else {
-			port = "443"
-		}
-	}
-
-	host := parsedURL.Hostname()
-	
-	return l9format.L9Event{
-		Ip:   host, // Will be resolved during scanning
-		Port: port,
-		Host: host,
-	}, nil
-}
-
-// isJSONFormat checks if the first line of the file looks like JSON
-func isJSONFormat(filename string) (bool, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return false, err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	if scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		return strings.HasPrefix(line, "{") && strings.Contains(line, "\""), nil
-	}
-	return false, scanner.Err()
-}
-
 func main() {
 	cli := CLI{}
 	ctx := kong.Parse(&cli)
@@ -103,7 +61,7 @@ func main() {
 	defer inputFile.Close()
 
 	if isJSON {
-		// Handle JSON format (existing behavior)
+		// Handle JSON l9format
 		jsonDecoder := json.NewDecoder(inputFile)
 		for {
 			var event l9format.L9Event
@@ -111,17 +69,24 @@ func main() {
 			if err != nil {
 				break
 			}
+			// If the transport field is missing, guess from port:
+			if len(event.Transports) < 2 {
+				if event.Port == "443" || event.Port == "8443" {
+					event.Transports = []string{"tcp", "tls", "http"}
+				} else {
+					event.Transports = []string{"tcp", "http"}
+				}
+			}
 			hostChannel <- event
 		}
 	} else {
-		// Handle URL list format (new behavior)
+		// Handle URL list format
 		scanner := bufio.NewScanner(inputFile)
 		for scanner.Scan() {
 			line := strings.TrimSpace(scanner.Text())
 			if !strings.HasPrefix(line, "http://") && !strings.HasPrefix(line, "https://") {
 				continue // Skip lines not starting with http:// or https://
 			}
-			
 			event, err := parseURL(line)
 			if err != nil {
 				log.Printf("Error parsing URL '%s': %v", line, err)
@@ -129,11 +94,58 @@ func main() {
 			}
 			hostChannel <- event
 		}
-		
+
 		if err := scanner.Err(); err != nil {
 			log.Printf("Error reading input file: %v", err)
 		}
 	}
 	close(hostChannel)
 	waitGroup.Wait()
+}
+
+// parseURL converts a URL string to an L9Event
+func parseURL(urlStr string) (l9format.L9Event, error) {
+	parsedURL, err := url.Parse(strings.TrimSpace(urlStr))
+	if err != nil {
+		return l9format.L9Event{}, err
+	}
+
+	// Default to HTTPS port if no port specified
+	port := parsedURL.Port()
+	if port == "" {
+		if parsedURL.Scheme == "http" {
+			port = "80"
+		} else {
+			port = "443"
+		}
+	}
+	transports := []string{"tcp"}
+	if parsedURL.Scheme == "https" {
+		transports = append(transports, "tls")
+	}
+	transports = append(transports, "http")
+	host := parsedURL.Hostname()
+
+	return l9format.L9Event{
+		Ip:         host, // Will be resolved during scanning
+		Port:       port,
+		Host:       host,
+		Transports: transports,
+	}, nil
+}
+
+// isJSONFormat checks if the first line of the file looks like JSON
+func isJSONFormat(filename string) (bool, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return false, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	if scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		return strings.HasPrefix(line, "{") && strings.Contains(line, "\""), nil
+	}
+	return false, scanner.Err()
 }
