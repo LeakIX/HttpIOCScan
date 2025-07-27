@@ -16,19 +16,28 @@ $ CGO_ENABLED=0 go build -o HttpIOCScan ./cmd/HttpIOCScan
 
 ## Usage
 
-1. Create a JSON file with targets:
+Provide targets and configuration:
 
+```shell
+$ ./HttpIOCScan urls.txt config.json > results.json
+```
+
+### Input Formats
+
+**JSON Lines Format:**
 ```json lines
 {"ip":"127.0.0.1","port":"443","host":"localhost.localdomain"}
 {"ip":"127.0.1.1","port":"443","host":"localhost.localdomain"}
 ....
 ```
 
-2. Run with a detection rule configuration:
-
-```shell
-$ ./HttpIOCScan input.json config.json > results.json
+**URL List Format:**
 ```
+https://example.com:443
+https://another-host.example.com:8443
+```
+
+The tool automatically detects the input format based on file content.
 
 ### Command Line Options
 
@@ -37,7 +46,7 @@ $ ./HttpIOCScan --help
 Usage: HttpIOCScan <input> <config>
 
 Arguments:
-  <input>     JSON file containing targets to scan
+  <input>     Input file containing targets to scan (JSON Lines or URL list format)
   <config>    JSON configuration file with detection rules
 
 Flags:
@@ -49,10 +58,13 @@ Flags:
 **Examples:**
 ```shell
 # Use custom number of routines and delay
-$ ./HttpIOCScan -r 500 -d 2s input.json citrix-config.json > results.json
+$ ./HttpIOCScan -r 500 -d 2s targets.txt citrix-config.json > results.json
 
 # Fast scanning with minimal delay  
-$ ./HttpIOCScan --routines 100 --delay 100ms input.json sharepoint-config.json > results.json
+$ ./HttpIOCScan --routines 100 --delay 100ms urls.txt sharepoint-config.json > results.json
+
+# Using JSON Lines format
+$ ./HttpIOCScan targets.json citrix-config.json > results.json
 ```
 
 ### Example Configurations
