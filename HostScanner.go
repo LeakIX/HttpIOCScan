@@ -33,11 +33,11 @@ func (hs *HostScanner) Start() {
 	}
 }
 
-func (hs *HostScanner) testSoftwareFingerprint(event l9format.L9Event, rule DetectionRule) bool {
+func (hs *HostScanner) testSoftwareFingerprint(event l9format.L9Event) bool {
 	// Test if target matches the software fingerprint
-	resp, err := hs.HttpClient.Get(event.Url() + rule.FingerprintCheck.Uri)
+	resp, err := hs.HttpClient.Get(event.Url() + hs.Rule.FingerprintCheck.Uri)
 	if err != nil {
-		log.Printf("Error fingerprinting host %s with rule %s: %v", event.Url(), rule.Name, err)
+		log.Printf("Error fingerprinting host %s with rule %s: %v", event.Url(), hs.Rule.Name, err)
 		return false
 	}
 	defer resp.Body.Close()
@@ -46,29 +46,29 @@ func (hs *HostScanner) testSoftwareFingerprint(event l9format.L9Event, rule Dete
 		log.Printf("Error reading fingerprint body for host %s: %v", event.Url(), err)
 		return false
 	}
-	if !strings.Contains(string(body), rule.FingerprintCheck.ExpectedContent) {
+	if !strings.Contains(string(body), hs.Rule.FingerprintCheck.ExpectedContent) {
 		return false
 	}
 	_, _ = io.Copy(io.Discard, resp.Body)
-	log.Printf("Host %s matches %s fingerprint", event.Url(), rule.Name)
+	log.Printf("Host %s matches %s fingerprint", event.Url(), hs.Rule.Name)
 	return true
 }
 
-func (hs *HostScanner) getNormalStatusCodeForRule(event l9format.L9Event, rule DetectionRule) int {
+func (hs *HostScanner) getNormalStatusCodeForRule(event l9format.L9Event) int {
 	// Get expected status code for non-existent files using rule's test Uri
 	randNumber := rand.IntN(10000000)
-	resp, err := hs.HttpClient.Get(event.Url() + fmt.Sprintf(rule.NonExistentFileUri, randNumber))
+	resp, err := hs.HttpClient.Get(event.Url() + fmt.Sprintf(hs.Rule.NonExistentFileUri, randNumber))
 	if err != nil {
-		log.Printf("Error getting baseline status code for host %s with rule %s: %v", event.Url(), rule.Name, err)
+		log.Printf("Error getting baseline status code for host %s with rule %s: %v", event.Url(), hs.Rule.Name, err)
 		return 0
 	}
 	defer resp.Body.Close()
 	_, _ = io.Copy(io.Discard, resp.Body)
-	log.Printf("Baseline status code for %s (%s): %d", event.Url(), rule.Name, resp.StatusCode)
+	log.Printf("Baseline status code for %s (%s): %d", event.Url(), hs.Rule.Name, resp.StatusCode)
 	return resp.StatusCode
 }
 
-func (hs *HostScanner) scanWithRule(event l9format.L9Event, uri string, expectedStatusCode int, rule DetectionRule) (bool, error) {
+func (hs *HostScanner) scanEvent(event l9format.L9Event, uri string, expectedStatusCode int) (bool, error) {
 	finalUrl := event.Url() + uri
 	resp, err := hs.HttpClient.Get(finalUrl)
 	if err != nil {
@@ -80,7 +80,7 @@ func (hs *HostScanner) scanWithRule(event l9format.L9Event, uri string, expected
 	log.Printf("Scan results: [%d] %s", resp.StatusCode, finalUrl)
 	if resp.StatusCode != expectedStatusCode {
 		// Check rule-specific exclusions
-		for _, exception := range rule.ExceptionURLs {
+		for _, exception := range hs.Rule.ExceptionURLs {
 			if strings.Contains(uri, exception.Uri) && resp.StatusCode == exception.StatusCode {
 				return false, nil
 			}
@@ -92,7 +92,7 @@ func (hs *HostScanner) scanWithRule(event l9format.L9Event, uri string, expected
 		event.EventType = "leak"
 		event.EventSource = "GenericIOCScan"
 		event.EventPipeline = append(event.EventPipeline, event.EventSource)
-		event.Summary = fmt.Sprintf("%s abnormal reply:\n", rule.Name)
+		event.Summary = fmt.Sprintf("%s abnormal reply:\n", hs.Rule.Name)
 		event.Summary += fmt.Sprintf("Found %d instead of %d on %s", resp.StatusCode, expectedStatusCode, finalUrl)
 		event.Leak.Severity = "critical"
 		event.Leak.Dataset.Infected = true
@@ -107,18 +107,18 @@ func (hs *HostScanner) scanWithRule(event l9format.L9Event, uri string, expected
 
 func (hs *HostScanner) scanUrls(event l9format.L9Event) {
 	// Check if target matches this rule's fingerprint
-	if !hs.testSoftwareFingerprint(event, *hs.Rule) {
+	if !hs.testSoftwareFingerprint(event) {
 		return
 	}
 	// Get normal status code for non-existing files
-	normalStatusCode := hs.getNormalStatusCodeForRule(event, *hs.Rule)
+	normalStatusCode := hs.getNormalStatusCodeForRule(event)
 	if normalStatusCode == 0 {
 		return
 	}
 	// Scan IOCs for this rule
 	connErrorCount := 0
 	for _, uri := range hs.Rule.IOCs {
-		found, err := hs.scanWithRule(event, uri, normalStatusCode, *hs.Rule)
+		found, err := hs.scanEvent(event, uri, normalStatusCode)
 		// If found, no need to go deeper
 		if found {
 			return
