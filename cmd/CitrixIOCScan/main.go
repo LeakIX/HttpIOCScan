@@ -1,28 +1,32 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"github.com/LeakIX/l9format"
-	"github.com/leakix/CitrixIOCScan"
+	"github.com/leakix/HttpIOCScan"
 	"log"
 	"os"
-	"strings"
 	"sync"
 )
 
 var MaxRoutines = 1000
 
 func main() {
-	if len(os.Args) < 3 {
-		log.Fatalf("%s requires at least 2 arguments: <url_list.txt> and <input_file.json>", os.Args[0])
+	if len(os.Args) != 3 {
+		log.Fatalf("%s requires 2 arguments: <input_file.json> <config_file.json>", os.Args[0])
 		os.Exit(1)
 	}
-	loadUrlList()
+	
+	// Load detection rule
+	rule, err := HttpIOCScan.LoadDetectionRule(os.Args[2])
+	if err != nil {
+		log.Fatalf("Error loading config file: %v", err)
+	}
+	
 	hostChannel := make(chan l9format.L9Event)
 	waitGroup := &sync.WaitGroup{}
-	StartHostScanners(waitGroup, MaxRoutines, hostChannel)
-	hostListJson, err := os.Open(os.Args[2])
+	StartHostScanners(waitGroup, MaxRoutines, hostChannel, rule)
+	hostListJson, err := os.Open(os.Args[1])
 	if err != nil {
 		log.Fatal(err)
 		os.Exit(1)
@@ -40,38 +44,18 @@ func main() {
 	waitGroup.Wait()
 }
 
-func StartHostScanners(waitGroup *sync.WaitGroup, num int, hostChan chan l9format.L9Event) {
+func StartHostScanners(waitGroup *sync.WaitGroup, num int, hostChan chan l9format.L9Event, rule *HttpIOCScan.DetectionRule) {
 	OutputEncoder := json.NewEncoder(os.Stdout)
-	HttpClient := CitrixIOCScan.GetSaneHttpClient(MaxRoutines)
-	UrlList := loadUrlList()
+	HttpClient := HttpIOCScan.GetSaneHttpClient(MaxRoutines)
 	for i := 0; i < num; i++ {
-		hs := CitrixIOCScan.HostScanner{
+		hs := HttpIOCScan.HostScanner{
 			WaitGroup:     waitGroup,
 			HostChannel:   hostChan,
 			OutputEncoder: OutputEncoder,
 			HttpClient:    HttpClient,
-			Urls:          UrlList,
+			Rule:          rule,
 		}
 		go hs.Start()
 	}
 }
 
-func loadUrlList() []string {
-	var urls []string
-	file, err := os.Open(os.Args[1])
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		if !strings.HasPrefix(scanner.Text(), "/") {
-			continue
-		}
-		urls = append(urls, scanner.Text())
-	}
-	if len(urls) == 0 {
-		log.Fatal("No urls found")
-	}
-	return urls
-}

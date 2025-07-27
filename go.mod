@@ -1,4 +1,4 @@
-module github.com/leakix/CitrixIOCScan
+module github.com/leakix/HttpIOCScan
 
 go 1.23
 

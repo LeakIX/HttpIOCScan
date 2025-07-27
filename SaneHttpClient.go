@@ -1,4 +1,4 @@
-package CitrixIOCScan
+package HttpIOCScan
 
 import (
 	"crypto/tls"

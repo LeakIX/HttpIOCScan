@@ -1,4 +1,4 @@
-package CitrixIOCScan
+package HttpIOCScan
 
 import (
 	"encoding/json"
@@ -18,7 +18,7 @@ type HostScanner struct {
 	HostChannel   chan l9format.L9Event
 	HttpClient    *http.Client
 	OutputEncoder *json.Encoder
-	Urls          []string
+	Rule          *DetectionRule
 }
 
 func (hs *HostScanner) Start() {
@@ -32,64 +32,66 @@ func (hs *HostScanner) Start() {
 	}
 }
 
-func (hs *HostScanner) testIfCitrixADC(event l9format.L9Event) bool {
-	// Checking for a valid ctx page before scanning
-	resp, err := hs.HttpClient.Get(event.Url() + "/logon/LogonPoint/init.js")
+func (hs *HostScanner) testSoftwareFingerprint(event l9format.L9Event, rule DetectionRule) bool {
+	// Test if target matches the software fingerprint
+	resp, err := hs.HttpClient.Get(event.Url() + rule.FingerprintCheck.Uri)
 	if err != nil {
-		log.Printf("Error scanning host %s: %v", event.Url(), err)
+		log.Printf("Error fingerprinting host %s with rule %s: %v", event.Url(), rule.Name, err)
 		return false
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 128*1024))
 	if err != nil {
-		log.Printf("Error reading body for host %s: %v", event.Url(), err)
-	}
-	if !strings.Contains(string(body), "gatewaycustomStyle") {
+		log.Printf("Error reading fingerprint body for host %s: %v", event.Url(), err)
 		return false
 	}
-	io.Copy(io.Discard, resp.Body)
+	if !strings.Contains(string(body), rule.FingerprintCheck.ExpectedContent) {
+		return false
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	log.Printf("Host %s matches %s fingerprint", event.Url(), rule.Name)
 	return true
 }
 
-func (hs *HostScanner) getNormalStatusCode(event l9format.L9Event) int {
-	// Checking for a non-valid ctx page status code
+func (hs *HostScanner) getNormalStatusCodeForRule(event l9format.L9Event, rule DetectionRule) int {
+	// Get expected status code for non-existent files using rule's test Uri
 	randNumber := rand.IntN(10000000)
-	resp, err := hs.HttpClient.Get(event.Url() + fmt.Sprintf("/logon/LogonPoint/receiver/js/localization/file%d.php", randNumber))
+	resp, err := hs.HttpClient.Get(event.Url() + fmt.Sprintf(rule.NonExistentFileUri, randNumber))
 	if err != nil {
-		log.Printf("Error scanning host %s: %v", event.Url(), err)
+		log.Printf("Error getting baseline status code for host %s with rule %s: %v", event.Url(), rule.Name, err)
 		return 0
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
+	_, _ = io.Copy(io.Discard, resp.Body)
+	log.Printf("Baseline status code for %s (%s): %d", event.Url(), rule.Name, resp.StatusCode)
 	return resp.StatusCode
 }
 
-func (hs *HostScanner) scan(event l9format.L9Event, uri string, expectedStatusCode int) (bool, error) {
+func (hs *HostScanner) scanWithRule(event l9format.L9Event, uri string, expectedStatusCode int, rule DetectionRule) (bool, error) {
 	finalUrl := event.Url() + uri
 	resp, err := hs.HttpClient.Get(finalUrl)
 	if err != nil {
-		log.Printf("Error scanning host/uri: %s", finalUrl, err)
+		log.Printf("Error scanning host/uri: %s: %v", finalUrl, err)
 		return false, err
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
-	log.Printf("Final results: [%d] %s", resp.StatusCode, finalUrl)
+	_, _ = io.Copy(io.Discard, resp.Body)
+	log.Printf("Scan results: [%d] %s", resp.StatusCode, finalUrl)
 	if resp.StatusCode != expectedStatusCode {
-		// This page is always 404
-		if strings.HasSuffix(finalUrl, "/logon/logonPoint/index.php") && resp.StatusCode == 404 {
-			return false, nil
-		}
-		if strings.HasPrefix(uri, "/logon/LogonPoint/receiver/css/themes_gw") && resp.StatusCode == 404 {
-			return false, nil
+		// Check rule-specific exclusions
+		for _, exception := range rule.ExceptionURLs {
+			if strings.Contains(uri, exception.Uri) && resp.StatusCode == exception.StatusCode {
+				return false, nil
+			}
 		}
 		if len(resp.TLS.PeerCertificates) > 0 {
 			event.SSL.Certificate.CommonName = resp.TLS.PeerCertificates[0].Subject.CommonName
 			event.SSL.Certificate.Domains = resp.TLS.PeerCertificates[0].DNSNames
 		}
 		event.EventType = "leak"
-		event.EventSource = "CitrixIOScan"
+		event.EventSource = "GenericIOCScan"
 		event.EventPipeline = append(event.EventPipeline, event.EventSource)
-		event.Summary = "Citrix ADC abnormal reply:\n"
+		event.Summary = fmt.Sprintf("%s abnormal reply:\n", rule.Name)
 		event.Summary += fmt.Sprintf("Found %d instead of %d on %s", resp.StatusCode, expectedStatusCode, finalUrl)
 		event.Leak.Severity = "critical"
 		event.Leak.Dataset.Infected = true
@@ -103,22 +105,22 @@ func (hs *HostScanner) scan(event l9format.L9Event, uri string, expectedStatusCo
 }
 
 func (hs *HostScanner) scanUrls(event l9format.L9Event) {
-	// Check if really ADC
-	if !hs.testIfCitrixADC(event) {
+	// Check if target matches this rule's fingerprint
+	if !hs.testSoftwareFingerprint(event, *hs.Rule) {
 		return
 	}
-	// Get a usual status code for non-existing PHP pages
-	normalStatusCode := hs.getNormalStatusCode(event)
+	// Get normal status code for non-existing files
+	normalStatusCode := hs.getNormalStatusCodeForRule(event, *hs.Rule)
 	if normalStatusCode == 0 {
 		return
 	}
-	// Go over URLs and check for 200s
+	// Scan IOCs for this rule
 	connErrorCount := 0
-	for _, uri := range hs.Urls {
-		found, err := hs.scan(event, uri, normalStatusCode)
+	for _, uri := range hs.Rule.IOCs {
+		found, err := hs.scanWithRule(event, uri, normalStatusCode, *hs.Rule)
 		// If found, no need to go deeper
 		if found {
-			break
+			return
 		}
 		// If more than 5 connection error, stop
 		if err != nil {
@@ -127,7 +129,7 @@ func (hs *HostScanner) scanUrls(event l9format.L9Event) {
 				break
 			}
 		}
-		// Wait a relatively safe random time before checking the next URL
+		// Wait a relatively safe random time before checking the next Uri
 		dur := 1 * time.Second
 		dur += time.Duration(rand.IntN(900)) * time.Millisecond
 		time.Sleep(dur)
