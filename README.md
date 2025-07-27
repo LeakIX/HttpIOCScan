@@ -4,11 +4,26 @@ Configurable tool to scan for webshell indicators of compromise (IOCs) across HT
 
 ## Installation
 
+### Pre-built Binaries
+
+Download the latest release from [GitHub Releases](https://github.com/LeakIX/HttpIOCScan/releases):
+
+```shell
+# Linux/macOS
+$ curl -L -o HttpIOCScan https://github.com/LeakIX/HttpIOCScan/releases/latest/download/HttpIOCScan-linux-amd64
+$ chmod +x HttpIOCScan
+
+# Windows
+$ curl -L -o HttpIOCScan.exe https://github.com/LeakIX/HttpIOCScan/releases/latest/download/HttpIOCScan-windows-amd64.exe
+```
+
+### Build from Source
+
 ```shell
 $ go install github.com/leakix/HttpIOCScan/cmd/HttpIOCScan@latest
 ```
 
-or build:
+or build locally:
 
 ```shell
 $ CGO_ENABLED=0 go build -o HttpIOCScan ./cmd/HttpIOCScan
