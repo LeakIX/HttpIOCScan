@@ -18,7 +18,7 @@ Originally designed for Citrix ADC/NetScaler but now supports multiple software 
 
 The application follows a concurrent producer-consumer pattern:
 
-- **Main entry point**: `cmd/CitrixIOCScan/main.go` - handles command-line arguments and orchestrates the scanning
+- **Main entry point**: `cmd/HttpIOCScan/main.go` - handles command-line arguments and orchestrates the scanning
 - **Core scanning logic**: `HostScanner.go` - implements the generic scanning logic with configurable rules
 - **HTTP client configuration**: `SaneHttpClient.go` - provides a properly configured HTTP client for security scanning
 - **Configuration system**: `ScannerConfig.go` - defines detection rules and loads configurations

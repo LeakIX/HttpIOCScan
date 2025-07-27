@@ -19,6 +19,7 @@ type HostScanner struct {
 	HttpClient    *http.Client
 	OutputEncoder *json.Encoder
 	Rule          *DetectionRule
+	Delay         time.Duration
 }
 
 func (hs *HostScanner) Start() {
@@ -130,7 +131,10 @@ func (hs *HostScanner) scanUrls(event l9format.L9Event) {
 			}
 		}
 		// Wait a relatively safe random time before checking the next Uri
-		dur := 1 * time.Second
+		dur := hs.Delay
+		if dur == 0 {
+			dur = 1 * time.Second
+		}
 		dur += time.Duration(rand.IntN(900)) * time.Millisecond
 		time.Sleep(dur)
 	}

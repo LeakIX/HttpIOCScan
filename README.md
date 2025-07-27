@@ -30,6 +30,31 @@ $ CGO_ENABLED=0 go build -o HttpIOCScan ./cmd/HttpIOCScan
 $ ./HttpIOCScan input.json config.json > results.json
 ```
 
+### Command Line Options
+
+```shell
+$ ./HttpIOCScan --help
+Usage: HttpIOCScan <input> <config>
+
+Arguments:
+  <input>     JSON file containing targets to scan
+  <config>    JSON configuration file with detection rules
+
+Flags:
+  -h, --help                Show context-sensitive help.
+  -r, --routines=1000       Number of concurrent scanning routines
+  -d, --delay=1s            Base delay between requests (randomized +0-900ms)
+```
+
+**Examples:**
+```shell
+# Use custom number of routines and delay
+$ ./HttpIOCScan -r 500 -d 2s input.json citrix-config.json > results.json
+
+# Fast scanning with minimal delay  
+$ ./HttpIOCScan --routines 100 --delay 100ms input.json sharepoint-config.json > results.json
+```
+
 ### Example Configurations
 
 See the `examples/` directory for sample detection rules:
