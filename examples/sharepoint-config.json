@@ -2,8 +2,8 @@
   "name": "Microsoft SharePoint",
   "description": "Detects webshells on compromised SharePoint servers",
   "fingerprint_check": {
-    "uri": "/_layouts/15/start.aspx",
-    "expected_content": "SharePoint"
+    "uri": "/_layouts/15/WFUtility.js",
+    "expected_content": "LoadIntegratedApps"
   },
   "non_existent_file_uri": "/_layouts/15/nonexistent%d.aspx",
   "iocs": [

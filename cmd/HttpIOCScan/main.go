@@ -21,13 +21,13 @@ type CLI struct {
 func main() {
 	cli := CLI{}
 	ctx := kong.Parse(&cli)
-	
+
 	// Load detection rule
 	rule, err := HttpIOCScan.LoadDetectionRule(cli.ConfigFile)
 	if err != nil {
 		log.Fatalf("Error loading config file: %v", err)
 	}
-	
+
 	hostChannel := make(chan l9format.L9Event)
 	waitGroup := &sync.WaitGroup{}
 	StartHostScanners(waitGroup, cli.Routines, hostChannel, rule, cli.Delay)
@@ -36,7 +36,7 @@ func main() {
 		ctx.Fatalf("Error opening input file: %v", err)
 	}
 	defer hostListJson.Close()
-	
+
 	jsonDecoder := json.NewDecoder(hostListJson)
 	for {
 		var event l9format.L9Event
@@ -50,10 +50,10 @@ func main() {
 	waitGroup.Wait()
 }
 
-func StartHostScanners(waitGroup *sync.WaitGroup, num int, hostChan chan l9format.L9Event, rule *HttpIOCScan.DetectionRule, delay time.Duration) {
+func StartHostScanners(waitGroup *sync.WaitGroup, maxRoutines int, hostChan chan l9format.L9Event, rule *HttpIOCScan.DetectionRule, delay time.Duration) {
 	OutputEncoder := json.NewEncoder(os.Stdout)
-	HttpClient := HttpIOCScan.GetSaneHttpClient(num)
-	for i := 0; i < num; i++ {
+	HttpClient := HttpIOCScan.GetSaneHttpClient(maxRoutines)
+	for i := 0; i < maxRoutines; i++ {
 		hs := HttpIOCScan.HostScanner{
 			WaitGroup:     waitGroup,
 			HostChannel:   hostChan,
@@ -65,4 +65,3 @@ func StartHostScanners(waitGroup *sync.WaitGroup, num int, hostChan chan l9forma
 		go hs.Start()
 	}
 }
-
