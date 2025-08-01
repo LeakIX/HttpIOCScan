@@ -1,0 +1,21 @@
+{
+  "name": "SonicWall SMA",
+  "description": "Detects webshells on compromised SonicWall SMA appliances",
+  "fingerprint_check": {
+    "uri": "/__api__/v1",
+    "expected_content": "documentation_url"
+  },
+  "non_existent_file_uri": "/spog/nonexistent%d",
+  "iocs": [
+    "/cgi-bin/wafxSummary",
+    "/spog/wafxSummary",
+    "/config.tgz",
+    "/overstep.tgz",
+    "/passwords.tgz",
+    "/password.tgz",
+    "/export.tgz",
+    "/pwd.tgz",
+    "/index.tgz"
+  ],
+  "exception_urls": []
+}
